@@ -1,0 +1,7 @@
+# Claude Code — exclude everything Claude-related from the repo
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.claude.json
+.claude.json.backup
+.mcp.json
