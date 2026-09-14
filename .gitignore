@@ -5,3 +5,12 @@ CLAUDE.local.md
 .claude.json
 .claude.json.backup
 .mcp.json
+
+# ignore the entire CLion/IntelliJ directory and workspace files
+.idea/
+*.iml
+
+# ignore build output directories across all IDEs and CLI
+build/
+cmake-build-*/
+out/
