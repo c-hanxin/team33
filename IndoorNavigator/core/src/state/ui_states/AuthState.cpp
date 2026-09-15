@@ -8,6 +8,8 @@ void AuthState::OnEnter(AppContext& context) {
     (void)context;
     isAuthenticating_ = true;
     std::cout << "[AuthState] Initiating authentication flow (Google / SIT school email)...\n";
+
+    
 }
 
 void AuthState::OnUpdate(AppContext& context, float deltaTime) {

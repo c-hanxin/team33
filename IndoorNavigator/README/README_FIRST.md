@@ -1,3 +1,51 @@
+## 1. Simulator Purpose & Build Instructions
+
+### What Purpose It Serves
+The **Desktop Navigation Simulator** (`nav_desktop_runner`) serves to demonstrate and verify how our indoor navigation application behaves before deploying it to an Android device.
+
+* **Shows Developers App Simulation**: Provides an interactive preview of how mobile UI actions trigger engine events, state transitions, and route calculations.
+* **Emulates Mobile UI & Engine Communication**: Mimics the data exchange across the future JNI boundary between Android (Kotlin) and the native C++ engine.
+* **Rapid Prototyping Without Android Overhead**: Allows team members to test floor switching, multi-floor route planning, waypoint advancement, and live obstacle rerouting without needing Android Studio, an emulator, or physical hardware.
+* **Real-Time Function Call Logging**: Every state transition and event dispatch emits a traceable log (e.g. `[Call] Class::Method(...)`), giving developers instant visibility into the internal call stack.
+
+---
+
+### How Linking Works
+`nav_desktop_runner` links directly against:
+1. `nav_engine` (`libnav_engine.a`): The static native C++20 engine library containing both state managers, contexts, and polymorphic states.
+2. `CliUI.cpp`: The lightweight terminal UI rendering the real-time status dashboard and 3D guidance HUD.
+
+It compiles as a native desktop binary with **zero Android NDK dependencies**, enabling sub-second compilation and test iteration.
+
+---
+
+### How to Build and Run
+
+#### Method A: In CLion (Recommended)
+1. **Select Target**: In the top-right toolbar dropdown, ensure the active configuration is **`nav_desktop_runner`** (a CMake Application target, *not* a single-file runner).
+2. **Build**: Press `Ctrl + F9` (or click the Hammer icon).
+3. **Run**: Press `Shift + F10` (or click the Green Play icon).
+
+> [!IMPORTANT]
+> **Windows File-Lock Warning**: If `nav_desktop_runner.exe` is already running in a terminal or the CLion Run tab, Windows locks the executable file. Attempting to rebuild while it is open will cause a linker error (`cannot open output file ... Permission denied`). Always stop the running simulator (or press `0` to exit) before recompiling.
+
+#### Method B: In Terminal / Command Prompt
+```powershell
+# 1. Configure CMake build cache
+cmake -B cmake-build-debug
+
+# 2. Compile and link the desktop runner target
+cmake --build cmake-build-debug --target nav_desktop_runner
+
+# 3. Execute the simulator
+.\cmake-build-debug\desktop_test\nav_desktop_runner.exe
+```
+
+* SIMULATION INSTRUCTIONS CAN BE FOUND IN simulation_interface.md
+
+---
+
+
 # Engine State Machine & Team Pipeline Integration Guide (`summary.md`)
 
 ## Executive Summary
