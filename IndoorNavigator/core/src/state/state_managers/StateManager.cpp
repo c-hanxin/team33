@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "state/events/EngineEvent.h"
+
 StateManager::StateManager() = default;
 
 void StateManager::ChangeState(StateType newType) {
@@ -26,18 +28,10 @@ void StateManager::SendEvent(const AppEvent& event) {
     coreManager_.DispatchEvent(engineEvent);
 }
 
-EngineContext& StateManager::GetContext() {
-    return coreManager_.GetContext();
-}
+EngineContext& StateManager::GetContext() { return coreManager_.GetContext(); }
 
-StateType StateManager::GetCurrentStateType() const {
-    return coreManager_.GetCurrentStateType();
-}
+StateType StateManager::GetCurrentStateType() const { return coreManager_.GetCurrentStateType(); }
 
-CoreStateManager& StateManager::GetCoreStateManager() {
-    return coreManager_;
-}
+CoreStateManager& StateManager::GetCoreStateManager() { return coreManager_; }
 
-AppStateManager& StateManager::GetAppStateManager() {
-    return appManager_;
-}
+AppStateManager& StateManager::GetAppStateManager() { return appManager_; }

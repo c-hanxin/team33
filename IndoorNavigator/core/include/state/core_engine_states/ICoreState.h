@@ -29,13 +29,7 @@ inline const char* coreStateTypeToString(CoreStateType type) {
     return "UnknownState";
 }
 
-struct EngineEvent {
-    int eventType{0};
-    std::string type;
-    int payloadInt{0};
-    bool payloadBool{false};
-    float payloadFloat{0.0f};
-};
+#include "state/events/EngineEvent.h"
 
 class ICoreState {
 public:

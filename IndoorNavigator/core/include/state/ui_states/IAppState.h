@@ -26,13 +26,7 @@ inline const char* appStateTypeToString(AppStateType type) {
     return "UnknownAppState";
 }
 
-struct AppEvent {
-    std::string type;
-    int payloadInt{0};
-    bool payloadBool{false};
-    float payloadFloat{0.0f};
-    std::string payloadString;
-};
+#include "state/events/AppEvent.h"
 
 class IAppState {
 public:

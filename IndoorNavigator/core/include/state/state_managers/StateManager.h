@@ -1,5 +1,6 @@
 #pragma once
 
+#include "state/events/AppEvent.h"
 #include "state/state_managers/AppStateManager.h"
 #include "state/state_managers/CoreStateManager.h"
 

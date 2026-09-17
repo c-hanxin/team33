@@ -9,22 +9,18 @@
 #include "state/core_engine_states/ObstacleReportState.h"
 #include "state/core_engine_states/RoutePlanningState.h"
 
-CoreStateManager::CoreStateManager() {
-    ChangeState(CoreStateType::Boot);
-}
+CoreStateManager::CoreStateManager() { ChangeState(CoreStateType::Boot); }
 
 void CoreStateManager::SetState(std::unique_ptr<ICoreState> newState) {
     std::cout << "[Call] CoreStateManager::SetState(newState="
               << (newState ? coreStateTypeToString(newState->GetType()) : "nullptr") << ")\n";
     if (currentState_) {
-        std::cout << "[Call] " << coreStateTypeToString(currentState_->GetType())
-                  << "::OnExit(context)\n";
+        std::cout << "[Call] " << coreStateTypeToString(currentState_->GetType()) << "::OnExit(context)\n";
         currentState_->OnExit(context_);
     }
     currentState_ = std::move(newState);
     if (currentState_) {
-        std::cout << "[Call] " << coreStateTypeToString(currentState_->GetType())
-                  << "::OnEnter(context)\n";
+        std::cout << "[Call] " << coreStateTypeToString(currentState_->GetType()) << "::OnEnter(context)\n";
         currentState_->OnEnter(context_);
     }
 }
@@ -46,19 +42,14 @@ void CoreStateManager::Update(float deltaTime) {
 void CoreStateManager::DispatchEvent(const EngineEvent& event) {
     std::cout << "[Call] CoreStateManager::DispatchEvent(type=\"" << event.type << "\")\n";
     if (currentState_) {
-        std::cout << "[Call] " << coreStateTypeToString(currentState_->GetType())
-                  << "::HandleEvent(context, event)\n";
+        std::cout << "[Call] " << coreStateTypeToString(currentState_->GetType()) << "::HandleEvent(context, event)\n";
         currentState_->HandleEvent(context_, event);
     }
 }
 
-EngineContext& CoreStateManager::GetContext() {
-    return context_;
-}
+EngineContext& CoreStateManager::GetContext() { return context_; }
 
-const EngineContext& CoreStateManager::GetContext() const {
-    return context_;
-}
+const EngineContext& CoreStateManager::GetContext() const { return context_; }
 
 CoreStateType CoreStateManager::GetCurrentStateType() const {
     if (currentState_) {
@@ -67,22 +58,20 @@ CoreStateType CoreStateManager::GetCurrentStateType() const {
     return CoreStateType::Boot;
 }
 
-bool CoreStateManager::HasActiveState() const {
-    return currentState_ != nullptr;
-}
+bool CoreStateManager::HasActiveState() const { return currentState_ != nullptr; }
 
 std::unique_ptr<ICoreState> CoreStateManager::CreateState(CoreStateType type) {
     switch (type) {
-        case CoreStateType::Boot:
-            return std::make_unique<BootState>();
-        case CoreStateType::Explore:
-            return std::make_unique<ExploreState>();
-        case CoreStateType::RoutePlanning:
-            return std::make_unique<RoutePlanningState>();
-        case CoreStateType::Navigation:
-            return std::make_unique<NavigationState>();
-        case CoreStateType::ObstacleReport:
-            return std::make_unique<ObstacleReportState>();
+    case CoreStateType::Boot:
+        return std::make_unique<BootState>();
+    case CoreStateType::Explore:
+        return std::make_unique<ExploreState>();
+    case CoreStateType::RoutePlanning:
+        return std::make_unique<RoutePlanningState>();
+    case CoreStateType::Navigation:
+        return std::make_unique<NavigationState>();
+    case CoreStateType::ObstacleReport:
+        return std::make_unique<ObstacleReportState>();
     }
     return nullptr;
 }

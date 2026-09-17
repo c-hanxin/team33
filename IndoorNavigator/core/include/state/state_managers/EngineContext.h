@@ -3,6 +3,13 @@
 #include <memory>
 #include <vector>
 
+/*
+This acts as our state tracker for the user's physical information. It exists at all times,
+it is owned by CoreStateManager.
+
+When we receive an AppEvent /  from the android side of the app, the AppEvent is
+handled and then the AppContext is updated to update our user's current state.
+*/
 class NavGraph;
 
 struct RouteWaypoint {
@@ -23,6 +30,10 @@ struct EngineContext {
     EngineContext();
     ~EngineContext();
 
+    /*
+    EngineContext should NEVER BE COPIED unless the EngineContext is an rvalue for scenarios
+    where two engine instances exist at the same time.
+    */
     EngineContext(const EngineContext&) = delete;
     EngineContext& operator=(const EngineContext&) = delete;
     EngineContext(EngineContext&&) noexcept;

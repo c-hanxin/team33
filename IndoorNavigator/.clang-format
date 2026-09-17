@@ -7,7 +7,13 @@ ColumnLimit: 120
 PointerAlignment: Left
 ReferenceAlignment: Pointer
 
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Never
+  BeforeElse: true
+  BeforeCatch: true
+SpaceBeforeParens: ControlStatements
+
 AccessModifierOffset: -4
 ConstructorInitializerIndentWidth: 4
 
