@@ -1,0 +1,43 @@
+{
+  "campus": "SIT Punggol",
+  "building": "Block E2",
+  "description": "Multi-floor navigation graph seed for SIT Block E2",
+  "floors": [1, 2, 3],
+  "nodes": [
+    { "id": 101, "x": 0.0, "y": 0.0, "z": 0.0, "floorId": 1, "type": "ROOM_DOOR", "label": "Room 101" },
+    { "id": 102, "x": 10.0, "y": 0.0, "z": 0.0, "floorId": 1, "type": "CORRIDOR_INTERSECTION", "label": "L1 Main Corridor North" },
+    { "id": 150, "x": 10.0, "y": 15.0, "z": 0.0, "floorId": 1, "type": "ELEVATOR_DOOR", "label": "L1 Elevator Lobby" },
+    { "id": 160, "x": 10.0, "y": -15.0, "z": 0.0, "floorId": 1, "type": "STAIR_LANDING", "label": "L1 Stairwell A" },
+
+    { "id": 201, "x": 0.0, "y": 0.0, "z": 4.0, "floorId": 2, "type": "ROOM_DOOR", "label": "Room 201" },
+    { "id": 204, "x": 20.0, "y": 0.0, "z": 4.0, "floorId": 2, "type": "ROOM_DOOR", "label": "Room 204 (Lab)" },
+    { "id": 202, "x": 10.0, "y": 0.0, "z": 4.0, "floorId": 2, "type": "CORRIDOR_INTERSECTION", "label": "L2 Main Corridor" },
+    { "id": 250, "x": 10.0, "y": 15.0, "z": 4.0, "floorId": 2, "type": "ELEVATOR_DOOR", "label": "L2 Elevator Lobby" },
+    { "id": 260, "x": 10.0, "y": -15.0, "z": 4.0, "floorId": 2, "type": "STAIR_LANDING", "label": "L2 Stairwell A" },
+
+    { "id": 301, "x": 0.0, "y": 0.0, "z": 8.0, "floorId": 3, "type": "ROOM_DOOR", "label": "Room 301" },
+    { "id": 302, "x": 10.0, "y": 0.0, "z": 8.0, "floorId": 3, "type": "CORRIDOR_INTERSECTION", "label": "L3 Main Corridor" },
+    { "id": 350, "x": 10.0, "y": 15.0, "z": 8.0, "floorId": 3, "type": "ELEVATOR_DOOR", "label": "L3 Elevator Lobby" },
+    { "id": 360, "x": 10.0, "y": -15.0, "z": 8.0, "floorId": 3, "type": "STAIR_LANDING", "label": "L3 Stairwell A" }
+  ],
+  "edges": [
+    { "id": 1, "sourceId": 101, "targetId": 102, "distance": 10.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 2, "sourceId": 102, "targetId": 150, "distance": 15.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 3, "sourceId": 102, "targetId": 160, "distance": 15.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+
+    { "id": 4, "sourceId": 201, "targetId": 202, "distance": 10.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 5, "sourceId": 202, "targetId": 204, "distance": 10.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 6, "sourceId": 202, "targetId": 250, "distance": 15.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 7, "sourceId": 202, "targetId": 260, "distance": 15.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+
+    { "id": 8, "sourceId": 301, "targetId": 302, "distance": 10.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 9, "sourceId": 302, "targetId": 350, "distance": 15.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+    { "id": 10, "sourceId": 302, "targetId": 360, "distance": 15.0, "edgeType": "HORIZONTAL_WALKWAY", "penaltyMultiplier": 1.0 },
+
+    { "id": 11, "sourceId": 150, "targetId": 250, "distance": 4.0, "edgeType": "ELEVATOR_SHAFT", "penaltyMultiplier": 1.0 },
+    { "id": 12, "sourceId": 250, "targetId": 350, "distance": 4.0, "edgeType": "ELEVATOR_SHAFT", "penaltyMultiplier": 1.0 },
+
+    { "id": 13, "sourceId": 160, "targetId": 260, "distance": 6.0, "edgeType": "STAIR_FLIGHT", "penaltyMultiplier": 1.5 },
+    { "id": 14, "sourceId": 260, "targetId": 360, "distance": 6.0, "edgeType": "STAIR_FLIGHT", "penaltyMultiplier": 1.5 }
+  ]
+}

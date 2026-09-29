@@ -38,7 +38,7 @@ cmake -B cmake-build-debug
 cmake --build cmake-build-debug --target nav_desktop_runner
 
 # 3. Execute the simulator
-.\cmake-build-debug\desktop_test\nav_desktop_runner.exe
+.\cmake-build-debug\platform\desktop\nav_desktop_runner.exe
 ```
 
 * SIMULATION INSTRUCTIONS CAN BE FOUND IN simulation_interface.md
@@ -58,21 +58,21 @@ This document provides a comprehensive technical overview of what has been imple
 
 The project currently has a clean, decoupled, and fully compilable C++20 engine and desktop testing harness:
 
-### 1.1. Native Engine Architecture (`core/`)
+### 1.1. Native Engine Architecture (`source/`)
 
-- **Polymorphic State Machine (FSM)**: Complete implementation of both application-level and engine-level states adhering strictly to [`core/docs/Standards.md`](../core/docs/Standards.md).
+- **Polymorphic State Machine (FSM)**: Complete implementation of both application-level and engine-level states adhering strictly to [`docs/Standards.md`](../docs/Standards.md).
 - **Two-Tier State Hierarchy**:
-  - **Tier 1 (Application Flow)**: [`AppStateManager`](../core/include/state/state_managers/AppStateManager.h) manages high-level mobile app screens: [`AuthState`](../core/include/state/ui_states/AuthState.h), [`MapViewState`](../core/include/state/ui_states/MapViewState.h), [`UserProfileState`](../core/include/state/ui_states/UserProfileState.h), and [`SearchHistoryState`](../core/include/state/ui_states/SearchHistoryState.h).
-  - **Tier 2 (Core 3D Engine)**: [`CoreStateManager`](../core/include/state/state_managers/CoreStateManager.h) manages 3D navigation and path calculation: [`BootState`](../core/include/state/core_engine_states/BootState.h), [`ExploreState`](../core/include/state/core_engine_states/ExploreState.h), [`RoutePlanningState`](../core/include/state/core_engine_states/RoutePlanningState.h), [`NavigationState`](../core/include/state/core_engine_states/NavigationState.h), and [`ObstacleReportState`](../core/include/state/core_engine_states/ObstacleReportState.h).
-- **Unified Facade ([`StateManager`](../core/include/state/state_managers/StateManager.h))**: Provides a single JNI-ready entry point to dispatch events, step frame updates, and query states across both tiers.
-- **Persistent Heap Contexts**: [`AppContext`](../core/include/state/state_managers/AppContext.h) and [`EngineContext`](../core/include/state/state_managers/EngineContext.h) persist across state transitions, preventing destructive memory wipes when changing UI tabs or reporting obstacles.
-- **Dynamic Multi-Floor Pathing Simulation**: [`RoutePlanningState`](../core/src/state/core_engine_states/RoutePlanningState.cpp) dynamically detects the user's starting floor (`context.currentFloorId`) and destination floor (`destId / 100`), generating multi-floor elevator routes when mobility filters (e.g. wheelchair mode / avoid stairs) are enabled.
+  - **Tier 1 (Application Flow)**: [`AppStateManager`](../source/app/AppStateManager.h) manages high-level mobile app screens: [`AuthState`](../source/ui/AuthState.h), [`MapViewState`](../source/ui/MapViewState.h), [`UserProfileState`](../source/ui/UserProfileState.h), and [`SearchHistoryState`](../source/ui/SearchHistoryState.h).
+  - **Tier 2 (Core 3D Engine)**: [`CoreStateManager`](../source/sim/CoreStateManager.h) manages 3D navigation and path calculation: [`BootState`](../source/sim/BootState.h), [`ExploreState`](../source/sim/ExploreState.h), [`RoutePlanningState`](../source/sim/RoutePlanningState.h), [`NavigationState`](../source/sim/NavigationState.h), and [`ObstacleReportState`](../source/sim/ObstacleReportState.h).
+- **Unified Facade ([`StateManager`](../source/app/StateManager.h))**: Provides a single JNI-ready entry point to dispatch events, step frame updates, and query states across both tiers.
+- **Persistent Heap Contexts**: [`AppContext`](../source/app/AppContext.h) and [`EngineContext`](../source/sim/EngineContext.h) persist across state transitions, preventing destructive memory wipes when changing UI tabs or reporting obstacles.
+- **Dynamic Multi-Floor Pathing Simulation**: [`RoutePlanningState`](../source/sim/RoutePlanningState.cpp) dynamically detects the user's starting floor (`context.currentFloorId`) and destination floor (`destId / 100`), generating multi-floor elevator routes when mobility filters (e.g. wheelchair mode / avoid stairs) are enabled.
 - **Real-Time Call Tracing**: Every lifecycle hook (`OnEnter`, `OnUpdate`, `OnExit`, `HandleEvent`) and event dispatch outputs live function logs (`[Call] Class::Method(...)`), giving immediate debugging transparency.
 
-### 1.2. Standalone Desktop Test Harness (`desktop_test/`)
+### 1.2. Standalone Desktop Shell (`platform/desktop/`)
 
 - **Zero-NDK Compilation**: Builds locally on Windows/macOS/Linux via CMake without needing Android Studio or physical mobile devices.
-- **Interactive Terminal UI ([`CliUI`](../desktop_test/CliUI.h))**:
+- **Interactive Terminal UI ([`CliUI`](../platform/desktop/CliUI.h))**:
   - Live status dashboard displaying both Tier 1 and Tier 2 states, user email, active floor, destination, and mobility toggles.
   - 3D Guidance HUD emulator displaying multi-floor waypoints with dynamic active cursor advancement.
   - Interactive CLI menu allowing manual floor switching, destination selection, step-by-step guidance advancement, dynamic obstacle reporting, auth toggling, and an automated end-to-end user journey test.
@@ -116,7 +116,7 @@ The state machine is built around three core design principles: **Separation of 
 
 ### 2.1. The 4 Standard Lifecycle Hooks
 
-Every state in both tiers inherits from an interface ([`IAppState`](../core/include/state/ui_states/IAppState.h) or [`ICoreState`](../core/include/state/core_engine_states/ICoreState.h)) and implements four polymorphic methods:
+Every state in both tiers inherits from an interface ([`IAppState`](../source/ui/IAppState.h) or [`ICoreState`](../source/sim/ICoreState.h)) and implements four polymorphic methods:
 
 1. **`OnEnter(Context& context)`**: Called exactly once when entering the state. Initializes state-specific resources or triggers automated calculations.
 2. **`OnUpdate(Context& context, float deltaTime)`**: Called on every frame tick to update animations, interpolate camera transitions, or advance guidance waypoints.
@@ -148,7 +148,7 @@ Each team member can plug their subsystem pipeline directly into the native stat
 #### Integration Points:
 
 1. **Engine Boot & Mesh Initialization (`CoreStateType::BOOT`)**:
-   - **Where**: [`BootState::OnEnter(EngineContext& context)`](../core/src/state/core_engine_states/BootState.cpp#L12)
+   - **Where**: [`BootState::OnEnter(EngineContext& context)`](../source/sim/BootState.cpp)
    - **Action**: Initialize OpenGL ES 3.0 context, compile shaders (tactical high-contrast wireframe/isometric shaders), and load pre-decimated 3D floor models (`.obj`/`.gltf`) from Android assets.
    - **Pipeline Hook**:
      ```cpp
@@ -169,7 +169,7 @@ Each team member can plug their subsystem pipeline directly into the native stat
      ```
 
 2. **Map Free-Look & Floor Swapping (`CoreStateType::EXPLORE`)**:
-   - **Where**: [`ExploreState::OnUpdate()`](../core/src/state/core_engine_states/ExploreState.cpp#L17) & [`ExploreState::HandleEvent()`](../core/src/state/core_engine_states/ExploreState.cpp#L25)
+   - **Where**: [`ExploreState::OnUpdate()`](../source/sim/ExploreState.cpp) & [`ExploreState::HandleEvent()`](../source/sim/ExploreState.cpp)
    - **Action**: In `OnUpdate()`, process touch gestures to rotate, pan, and pitch the isometric camera. In `HandleEvent()`, listen for `FLOOR_SWITCH` to toggle the visibility of specific floor mesh buffers.
    - **Pipeline Hook**:
      ```cpp
@@ -184,7 +184,7 @@ Each team member can plug their subsystem pipeline directly into the native stat
      ```
 
 3. **Active Navigation 3D Ribbon & Markers (`CoreStateType::NAVIGATION`)**:
-   - **Where**: [`NavigationState::OnUpdate(EngineContext& context, float deltaTime)`](../core/src/state/core_engine_states/NavigationState.cpp#L17)
+   - **Where**: [`NavigationState::OnUpdate(EngineContext& context, float deltaTime)`](../source/sim/NavigationState.cpp)
    - **Action**: Read `context.activeRoute` (list of `Waypoint` structs: `x`, `y`, `z`, `floorId`) and render the pulsating 3D navigation path line on top of the active floor mesh. Render the animated user position marker at `context.activeRoute[context.currentWaypointIndex]`.
 
 ---
@@ -196,7 +196,7 @@ Each team member can plug their subsystem pipeline directly into the native stat
 #### Integration Points:
 
 1. **User Authentication Flow (`AppStateType::AUTH`)**:
-   - **Where**: [`AuthState::HandleEvent(AppContext& context, const StateEvent& event)`](../core/src/state/ui_states/AuthState.cpp#L25)
+   - **Where**: [`AuthState::HandleEvent(AppContext& context, const StateEvent& event)`](../source/ui/AuthState.cpp)
    - **Action**: Verify student email (`@sit.singaporetech.edu.sg`) via Firebase Auth. On success, dispatch `AUTH_SUCCESS` with the user email payload.
    - **Pipeline Hook**:
      ```cpp
@@ -208,7 +208,7 @@ Each team member can plug their subsystem pipeline directly into the native stat
      ```
 
 2. **Crowdsourced Obstacle Reporting (`CoreStateType::OBSTACLE_REPORT`)**:
-   - **Where**: [`ObstacleReportState::OnEnter(EngineContext& context)`](../core/src/state/core_engine_states/ObstacleReportState.cpp#L12)
+   - **Where**: [`ObstacleReportState::OnEnter(EngineContext& context)`](../source/sim/ObstacleReportState.cpp)
    - **Action**: When a student reports an obstruction, the engine enters `ObstacleReportState`. Skyler's backend client serializes `context.activeEdgeId` and uploads it to Firebase Realtime Database / Firestore.
    - **Pipeline Hook**:
      ```cpp
@@ -256,10 +256,10 @@ Each team member can plug their subsystem pipeline directly into the native stat
 
 #### Integration Points:
 
-1. **`NavGraph` JSON Deserializer ([`core/include/data/DataParser.h`](../core/include/data/DataParser.h))**:
-   - Parse `block_e2_mock.json` into node and edge adjacency lists inside `EngineContext.navGraph`.
-2. **Multi-Floor $A^*$ Implementation ([`core/include/algorithms/AStar.h`](../core/include/algorithms/AStar.h))**:
-   - Replace the placeholder waypoints in [`RoutePlanningState::OnEnter()`](../core/src/state/core_engine_states/RoutePlanningState.cpp#L12) with a live call to `AStar::FindPath(graph, startNode, endNode, avoidStairs)`.
+1. **`NavGraph` JSON Deserializer (`source/sim/DataParser.h`)**:
+   - Parse `data/block_e2_mock.json` into node and edge adjacency lists inside `EngineContext.navGraph`.
+2. **Multi-Floor $A^*$ Implementation (`source/sim/AStar.h`)**:
+   - Replace the placeholder waypoints in [`RoutePlanningState::OnEnter()`](../source/sim/RoutePlanningState.cpp) with a live call to `AStar::FindPath(graph, startNode, endNode, avoidStairs)`.
 3. **Dynamic Edge Cost Mutation**:
    - When `ObstacleReportState` runs, assign `edge.penaltyMultiplier = INFINITY`, allowing the $A^*$ pathfinder to route around blocked corridors automatically.
 
@@ -272,20 +272,11 @@ Each team member can plug their subsystem pipeline directly into the native stat
 #### Integration Points:
 
 1. **Automated Desktop Test Harness**:
-   - Leverage [`desktop_test/main.cpp`](../desktop_test/main.cpp) option `[7]` (`RunFullWalkthrough`) to execute the 8-stage user journey headlessly in CI/CD pipelines.
-2. **Unit Test Harness**:
-   - Write tests targeting `StateManager` to assert that invalid transitions are rejected and that contexts retain correct values across state changes:
-     ```cpp
-     TEST(StateManagerTest, AvoidStairsGeneratesElevatorRoute) {
-         StateManager sm;
-         sm.SendEvent({StateEventType::BOOT_COMPLETE});
-         sm.SendEvent({StateEventType::FLOOR_SWITCH, "3"});
-         sm.SendEvent({StateEventType::DESTINATION_SELECTED, "203", {{"avoidStairs", "true"}}});
-
-         EXPECT_EQ(sm.GetCoreState(), CoreStateType::NAVIGATION);
-         EXPECT_TRUE(sm.GetEngineContext().avoidStairs);
-         // Verify that route contains elevator node (e.g. 350 -> 250)
-     }
+   - Leverage [`platform/desktop/main.cpp`](../platform/desktop/main.cpp) option `[7]` (`RunFullWalkthrough`) to execute the 8-stage user journey headlessly in CI/CD pipelines.
+2. **Headless Host Tests (`tests/HostTests.cpp`)**:
+   - Verify state machine integrity, update ticks, and determinism without a window or GPU:
+     ```bash
+     ctest --test-dir cmake-build-debug --output-on-failure
      ```
 
 ---
@@ -297,19 +288,19 @@ Each team member can plug their subsystem pipeline directly into the native stat
 #### Integration Points:
 
 1. **CMake Library Target**:
-   - [`core/CMakeLists.txt`](../core/CMakeLists.txt) exports `nav_engine` as a standalone `STATIC` library with public include directories (`core/include`).
+   - Root [`CMakeLists.txt`](../CMakeLists.txt) exports `nav_engine` as a standalone `STATIC` library with public include directories (`source/`).
 2. **Android Studio Integration**:
-   - In `android/app/build.gradle.kts`, configure `externalNativeBuild`:
+   - In `platform/android/app/build.gradle.kts`, configure `externalNativeBuild`:
      ```kotlin
      android {
          externalNativeBuild {
              cmake {
-                 path = file("../../CMakeLists.txt")
+                 path = file("../../../CMakeLists.txt")
              }
          }
      }
      ```
-   - Link `nav_engine` inside `android/app/src/main/cpp/CMakeLists.txt` to produce the final `libindoornav.so` JNI library.
+   - Link `nav_engine` inside `platform/android/app/src/main/cpp/CMakeLists.txt` to produce the final `libindoornav.so` JNI library.
 
 ---
 
@@ -333,17 +324,17 @@ Use this quick-reference table when triggering events across subsystems:
 
 When adding new features, follow these four rules to preserve architectural integrity:
 
-1. **Do Not Store Long-Lived Data Inside State Classes**: All data must reside in [`EngineContext`](../core/include/state/state_managers/EngineContext.h) or [`AppContext`](../core/include/state/state_managers/AppContext.h). State instances can be destroyed and recreated at any time.
-2. **Use Events for State Transitions**: Never call `ChangeState()` directly from Android UI or background threads. Send a [`StateEvent`](../core/include/state/state_managers/StateManager.h) through `StateManager::SendEvent()`.
+1. **Do Not Store Long-Lived Data Inside State Classes**: All data must reside in [`EngineContext`](../source/sim/EngineContext.h) or [`AppContext`](../source/app/AppContext.h). State instances can be destroyed and recreated at any time.
+2. **Use Events for State Transitions**: Never call `ChangeState()` directly from Android UI or background threads. Send a [`StateEvent`](../source/app/AppEvent.h) through `StateManager::SendEvent()`.
 3. **Keep Rendering in Tier 2**: Tier 1 (`AppStateManager`) must never interact directly with OpenGL ES or 3D mesh buffers. All spatial rendering belongs in Tier 2 states.
-4. **Follow C++ Standards**: All C++ code must strictly follow [`core/docs/Standards.md`](../core/docs/Standards.md) (trailing underscores for member variables, `camelCase` functions, `PascalCase` types, left-aligned pointers `Type* ptr`).
+4. **Follow C++ Standards**: All C++ code must strictly follow [`docs/Standards.md`](../docs/Standards.md) (trailing underscores for member variables, `camelCase` functions, `PascalCase` types, left-aligned pointers `Type* ptr`).
 
 ## 6. Code Execution Quick-Reference
 
 ### How Events Flow Across the Boundary
 
 ```cpp
-// Simulated Android UI Event in C++ (desktop_test/main.cpp)
+// Simulated Android UI Event in C++ (platform/desktop/main.cpp)
 StateManager engine;
 
 // 1. Transition core engine to explore view
@@ -374,7 +365,7 @@ To add a new state (e.g. `CalibrationState`):
 
    ```cpp
    #pragma once
-   #include "state/ICoreState.h"
+   #include "sim/ICoreState.h"
 
    class CalibrationState : public ICoreState {
    public:

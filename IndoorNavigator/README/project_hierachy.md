@@ -1,6 +1,7 @@
 # Indoor Navigation Core (`IndoorNavigator`)
 
 Native C++ pathfinding engine and cross-platform build target for the SIT Block E2 Indoor Navigation Project.
+Adheres to the CSD2401 M1G01 architecture standard.
 
 ---
 
@@ -8,19 +9,36 @@ Native C++ pathfinding engine and cross-platform build target for the SIT Block 
 
 ```text
 IndoorNavigator/
-├── .clang-format               # Project-wide code formatting rules
-├── CMakeLists.txt              # Root build script (Desktop runner & Android NDK)
-├── core/                       # Native C++ engine library (nav_engine)
-├── desktop_test/               # Standalone C++ test harness (nav_desktop_runner)
-└── android/                    # Android Studio application & JNI integration
+├── .clang-format                   # Project-wide code formatting rules
+├── CMakeLists.txt                  # Root build script (Engine, Desktop shell, Host tests)
+├── source/                         # Shared C++ — knows no platform
+│   ├── sim/                        # Simulation rules (pathfinding, graph, navigation states)
+│   ├── core/                       # Foundational systems (clock, entities, data, log)
+│   ├── render/                     # GL ES rendering only (reads sim state, never writes it)
+│   ├── ui/                         # UI state models (screen states)
+│   ├── services/                   # Network & persistence (Firebase sync, offline DB)
+│   └── app/                        # Application screens & wiring (StateManager facade)
+├── platform/                       # Platform shells — one per target
+│   ├── desktop/                    # Desktop developer shell & interactive simulator
+│   └── android/                    # Android platform shell (NDK, JNI bridge, Gradle)
+├── backend/                        # Cloud services & Firebase sync (any language)
+├── data/                           # Plain-text content reviewed in diffs (JSON graphs)
+├── assets/                         # Binary assets (3D models, textures)
+├── tests/                          # Host tests — no window, no GPU (determinism & tick tests)
+├── tools/                          # Tooling & automation
+│   └── ci/                         # CI scripts & layering enforcement (check_layering.py)
+└── docs/                           # Documentation & coding standards
 ```
 
 | Module / Target | Output | Role |
 | :--- | :--- | :--- |
-| **`core/`** | `nav_engine` (Static Lib) | Multi-floor $A^*$ pathfinding, dynamic graph mutations, and lifecycle FSM |
-| **`desktop_test/`** | `nav_desktop_runner` (Executable) | Windows/Desktop test harness for rapid prototyping and algorithm verification |
-| **`android/`** | Android Application (`.apk`) | 3D isometric UI, Room DB, and JNI bindings |
-| **`CMakeLists.txt`** | Build Script | Unified CMake configuration for Desktop and Android NDK |
+| **`source/`** | `nav_engine` (Static Lib) | Platform-agnostic C++20 engine containing simulation rules, state managers, and wiring |
+| **`platform/desktop/`** | `nav_desktop_runner` (Executable) | Windows/Desktop interactive simulator with terminal UI and guidance HUD |
+| **`platform/android/`** | Android Application (`.apk`) | Mobile shell, 3D isometric UI, Room DB, and JNI bindings |
+| **`tests/`** | `nav_host_tests` (Executable) | Fast headless host tests verifying update ticks, state machine, and determinism |
+| **`data/`** | Text Assets (`.json`) | Diffable campus graph seeds (`block_e2_mock.json`) |
+| **`assets/`** | Binary Assets (`.obj`, `.gltf`) | Decimated 3D campus floor models and textures |
+| **`CMakeLists.txt`** | Build Script | Unified one-step CMake build configuration |
 
 ---
 
@@ -29,30 +47,57 @@ IndoorNavigator/
 ```text
 IndoorNavigator/
 ├── .clang-format                   # LLVM-based code formatting configuration
-├── CMakeLists.txt                  # Root build script (delegates to desktop_test on desktop)
-├── core/
-│   ├── docs/
-│   │   └── Standards.md            # C++ coding conventions and style guide
-│   ├── include/
-│   │   ├── algorithms/             # AStar.h, Heuristics.h
-│   │   ├── data/                   # NavGraph.h, Node.h, Edge.h, POI.h, DataParser.h
-│   │   └── state/                  # StateManager.h, AppState.h
-│   └── src/
-│       ├── algorithms/             # AStar.cpp
-│       ├── data/                   # NavGraph.cpp, DataParser.cpp
-│       └── state/                  # StateManager.cpp
-├── desktop_test/
-│   ├── CMakeLists.txt              # Executable target: 'nav_desktop_runner'
-│   ├── main.cpp                    # Standalone test runner (loads mock graph, verifies A*)
-│   └── test_data/
-│       └── block_e2_mock.json      # Mock multi-floor node/edge graph
-└── android/                        # Android Studio Project Root
-    └── app/
-        ├── build.gradle.kts        # externalNativeBuild pointing to root CMakeLists.txt
-        └── src/main/
-            ├── assets/             # Decimated 3D models (.obj), graph.json seed
-            ├── cpp/jni_bridge.cpp  # JNI bindings between Kotlin and nav_engine
-            └── java/               # UI, Room DB, and NativeEngine JNI wrapper
+├── CMakeLists.txt                  # Root build script
+├── source/
+│   ├── sim/                        # Simulation rules (Tier 2 Core Engine)
+│   │   ├── ICoreState.h            # Core state interface
+│   │   ├── CoreStateManager.h/.cpp # Simulation state controller
+│   │   ├── EngineContext.h/.cpp    # Persistent simulation context (graph, route, floor)
+│   │   ├── EngineEvent.h           # Simulation events
+│   │   ├── BootState.h/.cpp        # Asset ingestion & setup
+│   │   ├── ExploreState.h/.cpp     # Campus free-look & camera control
+│   │   ├── NavigationState.h/.cpp  # Active guidance & turn-by-turn HUD
+│   │   ├── ObstacleReportState.h/.cpp # Blockage tap & raycast handling
+│   │   └── RoutePlanningState.h/.cpp  # Multi-floor A* route solver
+│   ├── core/                       # Core utilities (clock, entities, data, log)
+│   │   └── README.md
+│   ├── render/                     # OpenGL ES only (reads sim, never writes)
+│   │   └── README.md
+│   ├── ui/                         # UI state models (Tier 1 App States — Temporary C++ Desktop Prototype)
+│   │   ├── IAppState_temp.h        # App state interface (to be refactored to Kotlin)
+│   │   ├── AuthState_temp.h/.cpp   # Google / SIT email authentication (to be refactored to Kotlin)
+│   │   ├── MapViewState_temp.h/.cpp # Tactical map view screen (to be refactored to Kotlin)
+│   │   ├── SearchHistoryState_temp.h/.cpp # Search history screen (to be refactored to Kotlin)
+│   │   └── UserProfileState_temp.h/.cpp # User profile screen (to be refactored to Kotlin)
+│   ├── services/                   # Network & persistence
+│   │   └── README.md
+│   └── app/                        # Application screens & wiring
+│       ├── StateManager_temp.h/.cpp # Global State Facade (Temporary — migrating to Kotlin)
+│       ├── AppStateManager_temp.h/.cpp # UI State Manager (Temporary — migrating to Kotlin)
+│       ├── AppContext.h/.cpp       # Mobile session context (received via JNI)
+│       └── AppEvent.h              # Mobile UI events (received via JNI)
+├── platform/
+│   ├── desktop/                    # Desktop Shell
+│   │   ├── CMakeLists.txt          # Executable target: 'nav_desktop_runner'
+│   │   ├── CliUI.h/.cpp            # Terminal UI dashboard & guidance HUD emulator
+│   │   └── main.cpp                # Interactive simulator & end-to-end walkthrough
+│   └── android/                    # Android Shell
+│       └── README.md               # NDK / JNI bridge guidelines
+├── backend/                        # Backend cloud services & sync
+│   └── README.md
+├── data/                           # Plain-text content (diffable)
+│   ├── README.md
+│   └── block_e2_mock.json          # Mock multi-floor node/edge graph
+├── assets/                         # Binary assets (3D models, textures)
+│   └── README.md
+├── tests/                          # Host tests (no window, no GPU)
+│   ├── CMakeLists.txt              # Test target: 'nav_host_tests'
+│   └── HostTests.cpp               # Headless unit & determinism tests
+├── tools/
+│   └── ci/
+│       └── check_layering.py       # Script enforcing architectural layering rules
+└── docs/
+    └── Standards.md                # C++ coding conventions and style guide
 ```
 
 ---
@@ -61,7 +106,7 @@ IndoorNavigator/
 
 ### Coding Standards
 All C++ code must follow the conventions defined in:  
-📁 **[`core/docs/Standards.md`](core/docs/Standards.md)**
+📁 **[`docs/Standards.md`](../docs/Standards.md)**
 
 **Key Rules at a Glance**:
 - **Variables & Functions**: `camelCase` (e.g., `velocityChange`, `renderBody()`)
@@ -71,47 +116,36 @@ All C++ code must follow the conventions defined in:
 - **Pointers & References**: Left-aligned with variable name (`char* name`, `int& hp`)
 - **Header Files**: Always use `#pragma once`, follow the prescribed `#include` order
 
-### Clang-Format Configuration (`.clang-format`)
-Code formatting is enforced using the root [`.clang-format`](.clang-format) file (LLVM base, 4-space indentation, 100-character column limit).
-
-#### IDE Setup Instructions
-
-- **CLion / Android Studio**:
-  1. Open **Settings / Preferences** (`Ctrl + Alt + S`).
-  2. Navigate to **Editor → Code Style → ClangFormat**.
-  3. Ensure **Enable ClangFormat** is checked (it automatically detects `.clang-format` in the project root).
-  4. Format file or selection via `Ctrl + Alt + L` (Windows/Linux) or `Cmd + Option + L` (macOS).
-
-- **Visual Studio Code**:
-  1. Install the official **C/C++** extension (`ms-vscode.cpptools`).
-  2. Ensure `.vscode/settings.json` has:
-     ```json
-     {
-       "C_Cpp.formatting": "clangFormat",
-       "editor.formatOnSave": true
-     }
-     ```
-  3. Format file via `Shift + Alt + F`.
-
-- **Visual Studio**:
-  1. Open **Tools → Options → Text Editor → C/C++ → Code Style → Formatting → General**.
-  2. Enable **ClangFormat support**.
-  3. Format file via `Ctrl + K, Ctrl + D`.
-
-- **Command Line**:
+### Architectural Layering Rules
+As mandated by CSD2401 M1G01:
+- **Dependencies Point Down**: `shell` → `app` → `sim` & `ui`.
+- **`source/sim/`** contains **no OpenGL**, **no windowing**, **no platform headers**, and **no clock**.
+- **`source/render/`** reads simulation state and **never writes it**.
+- Verify compliance automatically via:
   ```bash
-  clang-format -i --style=file path/to/file.cpp
+  python tools/ci/check_layering.py
   ```
 
 ---
 
 ## Build Instructions
 
-### Desktop Test Harness (Windows / Local)
+### One-Step Build (Desktop Simulator & Host Tests)
 ```bash
 cmake -B build
-cmake --build build --target nav_desktop_runner
+cmake --build build
 ```
 
-### Android NDK
-Android Studio builds `nav_engine` automatically via `app/build.gradle.kts` (`externalNativeBuild`).
+### Running Host Tests (Headless)
+```bash
+# Via ctest
+ctest --test-dir build --output-on-failure
+
+# Or directly
+./build/tests/nav_host_tests
+```
+
+### Running Desktop Simulator
+```bash
+./build/platform/desktop/nav_desktop_runner
+```

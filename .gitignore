@@ -14,3 +14,15 @@ CLAUDE.local.md
 build/
 cmake-build-*/
 out/
+
+# Android Studio, Gradle, and NDK
+.gradle/
+local.properties
+.cxx/
+captures/
+*.apk
+*.aab
+*.dex
+*.hprof
+*.jks
+*.keystore

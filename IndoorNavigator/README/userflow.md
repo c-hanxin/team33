@@ -93,7 +93,7 @@ sequenceDiagram
 ### How Events Flow Across the Boundary
 
 ```cpp
-// Simulated Android UI Event in C++ (desktop_test/main.cpp)
+// Simulated Android UI Event in C++ (platform/desktop/main.cpp)
 StateManager engine;
 
 // 1. Transition core engine to explore view
