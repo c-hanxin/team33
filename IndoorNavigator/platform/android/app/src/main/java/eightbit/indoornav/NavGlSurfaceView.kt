@@ -61,6 +61,15 @@ class NavGlSurfaceView @JvmOverloads constructor(
         NativeEngine.nativeOnSurfaceChanged(width, height, density)
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && h > 0) {
+            queueEvent {
+                NativeEngine.nativeOnSurfaceChanged(w, h, density)
+            }
+        }
+    }
+
     override fun onDrawFrame(gl: GL10?) {
         val now = System.nanoTime()
         val dt = ((now - lastFrameTimeNs) / 1_000_000_000.0f).coerceIn(0.001f, 0.1f)

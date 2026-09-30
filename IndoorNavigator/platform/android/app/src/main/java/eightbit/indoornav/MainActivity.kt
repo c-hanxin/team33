@@ -42,6 +42,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Remove default opaque window background to prevent occluding the SurfaceView
+        window.setBackgroundDrawable(null)
 
         val rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -51,7 +53,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 1. OpenGL ES View
-        glView = NavGlSurfaceView(this)
+        glView = NavGlSurfaceView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
         rootLayout.addView(glView)
 
         // 2. HUD Overlay Container

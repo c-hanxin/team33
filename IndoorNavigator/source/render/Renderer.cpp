@@ -146,6 +146,7 @@ void Renderer::resize(int width, int height, float density) {
     GLfloat lineRange[2]{1.0f, 1.0f};
     glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, lineRange);
     lineWidth_ = std::clamp(2.0f * density_, lineRange[0], lineRange[1]);
+    updateCamera();
 }
 
 void Renderer::orbit(float dxPixels, float dyPixels) {
