@@ -4,10 +4,11 @@
 //              guidance HUD controls (floor switcher, destination selector).
 //
 // Modifications:
-//   - [HOW]: Package shortened to eightbit.indoornav. Created standard Activity layout
-//     programmatically with overlay controls dispatched via queueEvent() into NativeEngine.
-//   - [WHY]: Provides immediate UI interactivity for testing Arun's multi-floor renderer
-//     and JNI event dispatching on real Android devices.
+//   - [HOW]: Package shortened to eightbit.indoornav. Integrated GlobalStateManager
+//     to coordinate Kotlin Tier 1 UI FSM (Auth/MapView/Tabs) with C++ Tier 2 Core Engine.
+//     All GL actions are queued via glView.queueEvent() to satisfy Arun's threading rule.
+//   - [WHY]: Stage 2 Kotlin migration: Kotlin now orchestrates app lifecycle and UI screens,
+//     while C++ executes the 3D graphics and pathfinding engine.
 // ==============================================================================
 
 package eightbit.indoornav
@@ -23,15 +24,18 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import eightbit.indoornav.state.AppEvent
+import eightbit.indoornav.state.GlobalStateManager
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var glView: NavGlSurfaceView
     private lateinit var statusText: TextView
+    private val globalStateManager = GlobalStateManager.getInstance()
     private val handler = Handler(Looper.getMainLooper())
     private val updateStatusRunnable = object : Runnable {
         override fun run() {
-            statusText.text = NativeEngine.nativeGetStatus()
+            statusText.text = globalStateManager.getFullStatus()
             handler.postDelayed(this, 250) // Refresh status HUD 4 times per second
         }
     }
@@ -62,27 +66,60 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // Status HUD
+        // Combined Status HUD (Kotlin Tier 1 UI + C++ Tier 2 Core Engine)
         statusText = TextView(this).apply {
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#CC111827"))
+            setBackgroundColor(Color.parseColor("#E6111827"))
             setPadding(24, 16, 24, 16)
-            textSize = 12f
+            textSize = 11f
             typeface = android.graphics.Typeface.MONOSPACE
         }
         overlay.addView(statusText)
+
+        // UI Auth / Tab Row
+        val uiRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 12, 0, 4)
+        }
+        val loginBtn = Button(this).apply {
+            text = "Login"
+            setOnClickListener {
+                globalStateManager.sendEvent(
+                    AppEvent(type = "AUTH_SUCCESS", payloadString = "student@sit.singaporetech.edu.sg")
+                )
+            }
+        }
+        val profileBtn = Button(this).apply {
+            text = "Profile"
+            setOnClickListener {
+                globalStateManager.sendEvent(AppEvent(type = "SWITCH_TAB", payloadString = "UserProfile"))
+            }
+        }
+        val mapBtn = Button(this).apply {
+            text = "Map"
+            setOnClickListener {
+                globalStateManager.sendEvent(AppEvent(type = "SWITCH_TAB", payloadString = "MapView"))
+            }
+        }
+        uiRow.addView(loginBtn)
+        uiRow.addView(profileBtn)
+        uiRow.addView(mapBtn)
+        overlay.addView(uiRow)
 
         // Floor Switch Row
         val floorRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 16, 0, 8)
+            setPadding(0, 4, 0, 4)
         }
         listOf(1, 2, 3).forEach { floor ->
             val btn = Button(this).apply {
                 text = "L$floor"
                 setOnClickListener {
-                    glView.queueEvent { NativeEngine.nativeSetFloor(floor) }
+                    glView.queueEvent {
+                        globalStateManager.sendEvent(AppEvent(type = "FLOOR_SWITCH", payloadInt = floor))
+                    }
                 }
             }
             floorRow.addView(btn)
@@ -97,19 +134,27 @@ class MainActivity : AppCompatActivity() {
         val routeBtn = Button(this).apply {
             text = "Route 204"
             setOnClickListener {
-                glView.queueEvent { NativeEngine.nativeSelectDestination(204, true) }
+                glView.queueEvent {
+                    globalStateManager.sendEvent(
+                        AppEvent(type = "DESTINATION_SELECTED", payloadInt = 204, payloadBool = true)
+                    )
+                }
             }
         }
         val stepBtn = Button(this).apply {
             text = "Step >>"
             setOnClickListener {
-                glView.queueEvent { NativeEngine.nativeAdvanceWaypoint() }
+                glView.queueEvent {
+                    globalStateManager.sendEvent(AppEvent(type = "WAYPOINT_REACHED"))
+                }
             }
         }
         val cancelBtn = Button(this).apply {
             text = "Cancel"
             setOnClickListener {
-                glView.queueEvent { NativeEngine.nativeCancelNavigation() }
+                glView.queueEvent {
+                    globalStateManager.sendEvent(AppEvent(type = "CANCEL_NAVIGATION"))
+                }
             }
         }
         actionRow.addView(routeBtn)

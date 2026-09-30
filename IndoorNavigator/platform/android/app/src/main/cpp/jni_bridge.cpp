@@ -1,22 +1,21 @@
 // ==============================================================================
 // Source Origin: Arun (Feature Developer) - team33/arun/jni_bridge.cpp
-// Description: JNI translation layer between Kotlin NativeEngine.kt and C++ StateManager + OpenGL ES Renderer.
+// Description: JNI translation layer between Kotlin NativeEngine.kt and C++ CoreStateManager + OpenGL ES Renderer.
 //
 // Modifications:
 //   - [HOW]:
 //       1. Updated header include from "renderer/Renderer.h" to "render/Renderer.h".
-//       2. Updated header include from "state/state_managers/StateManager.h" to "app/StateManager_temp.h".
-//       3. Added #include "app/AppEvent.h" to supply AppEvent struct definition.
-//       4. Added #include "ui/IAppState_temp.h" and #include "sim/ICoreState.h" to resolve
-//          appStateTypeToString() and coreStateTypeToString() functions.
+//       2. Replaced #include "app/StateManager_temp.h" with #include "sim/CoreStateManager.h".
+//       3. Replaced #include "app/AppEvent.h" with #include "sim/EngineEvent.h".
+//       4. Included #include "sim/ICoreState.h" for coreStateTypeToString().
 //       5. Renamed JNI export prefix to Java_eightbit_indoornav_NativeEngine_ matching
 //          the shortened eightbit.indoornav package.
+//       6. Refactored NativeApp to hold CoreStateManager directly instead of StateManager_temp.
 //   - [WHY]:
-//       1. Adapt Arun's bridge to the restructured CSD2401 M1 directory layout.
-//       2. Interface directly with the temporary C++ StateManager facade (Option A of the
-//          architectural plan) to enable an immediate, working Android build for Milestone M1
-//          prior to migrating UI states to Kotlin.
-//       3. Satisfy the simplified eightbit.indoornav package identifier.
+//       Stage 2 Kotlin migration: Global & UI State Management (Tier 1) has been migrated to
+//       Kotlin (GlobalStateManager.kt and AppStateManager.kt). C++ now exclusively handles
+//       high-performance simulation (CoreStateManager) and 3D rendering (Renderer),
+//       completing clean architectural separation between Kotlin UI and C++ Engine.
 // ==============================================================================
 
 #include <jni.h>
@@ -28,18 +27,18 @@
 
 #include "LogcatStream.h"
 
-// [MODIFIED FROM ARUN'S CODE]: Updated include paths to match CSD2401 M1 directory hierarchy
-#include "app/AppEvent.h"
-#include "app/StateManager_temp.h"
+// [MODIFIED FROM ARUN'S CODE]: Connect directly to CoreStateManager and EngineEvent (Tier 2 Simulation)
 #include "render/Renderer.h"
+#include "sim/CoreStateManager.h"
+#include "sim/EngineEvent.h"
 #include "sim/ICoreState.h"
-#include "ui/IAppState_temp.h"
 
 namespace {
     constexpr float kEventTick = 0.016f;
 
     struct NativeApp {
-        StateManager engine;
+        // [MODIFIED FROM ARUN'S CODE]: Direct CoreStateManager ownership in C++
+        CoreStateManager engine;
         Renderer renderer;
         // TODO: move into EngineContext once NavigationState exposes its waypoint index
         std::size_t guidanceStep{0};
@@ -53,8 +52,8 @@ namespace {
         if (!g_app) {
             redirectStdoutToLogcat();
             g_app = std::make_unique<NativeApp>();
-            if (g_app->engine.GetCurrentStateType() == StateType::Boot) {
-                g_app->engine.ChangeState(StateType::Explore);
+            if (g_app->engine.GetCurrentStateType() == CoreStateType::Boot) {
+                g_app->engine.ChangeState(CoreStateType::Explore);
             }
         }
         return *g_app;
@@ -66,16 +65,16 @@ namespace {
     }
 
     void sendEvent(NativeApp& a, const char* type, int payloadInt = 0, bool payloadBool = false) {
-        AppEvent event;
+        EngineEvent event;
         event.type        = type;
         event.payloadInt  = payloadInt;
         event.payloadBool = payloadBool;
-        a.engine.SendEvent(event);
+        a.engine.DispatchEvent(event);
     }
 
     void cancelNavigation(NativeApp& a) {
         sendEvent(a, "CANCEL_NAVIGATION");
-        a.engine.ChangeState(StateType::Explore);
+        a.engine.ChangeState(CoreStateType::Explore);
         a.engine.Update(kEventTick);
         a.guidanceStep = 0;
     }
@@ -83,13 +82,12 @@ namespace {
     std::string buildStatus(NativeApp& a) {
         const EngineContext& ctx = a.engine.GetContext();
         std::ostringstream os;
-        os << "Tier 1: " << appStateTypeToString(a.engine.GetAppStateManager().GetCurrentStateType())
-           << "   |   Tier 2: " << coreStateTypeToString(a.engine.GetCurrentStateType()) << '\n';
+        os << "[C++ Tier 2 Engine]: State = " << coreStateTypeToString(a.engine.GetCurrentStateType()) << '\n';
         os << "Floor: Level " << ctx.currentFloorId << "   |   Avoid stairs: " << (ctx.avoidStairs ? "ON" : "OFF")
            << '\n';
 
         if (ctx.activeRoute.empty()) {
-            os << "No active route. Pick a room below.";
+            os << "No active route. Pick a destination above.";
         } else {
             const std::size_t step = a.guidanceStep;
             const RouteWaypoint& wp = ctx.activeRoute[step];
@@ -114,28 +112,26 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnSurfaceCreat
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnSurfaceChanged(JNIEnv*, jobject,
-                                                                                           jint width, jint height,
-                                                                                           jfloat density) {
+                                                                                   jint width, jint height,
+                                                                                   jfloat density) {
     app().renderer.resize(width, height, density);
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnDrawFrame(JNIEnv*, jobject,
-                                                                                       jfloat deltaTime) {
-    // NOTE: engine.Update() is only ticked after events for now. Every Update() prints
-    // several "[Call]" lines, which would flood Logcat at 60 fps. Tick it here per-frame
-    // once states actually need OnUpdate() (camera easing, sensor polling, ...).
+                                                                               jfloat deltaTime) {
+    // NOTE: engine.Update() is only ticked after events for now.
     app().renderer.draw(deltaTime);
 }
 
 // ---------------------------------------------------------------- Camera input
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnDrag(JNIEnv*, jobject, jfloat dx,
-                                                                                 jfloat dy) {
+                                                                         jfloat dy) {
     app().renderer.orbit(dx, dy);
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnZoom(JNIEnv*, jobject,
-                                                                                 jfloat scaleFactor) {
+                                                                         jfloat scaleFactor) {
     app().renderer.zoom(scaleFactor);
 }
 
@@ -149,18 +145,18 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSetFloor(JNIEn
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSelectDestination(JNIEnv*, jobject,
-                                                                                             jint roomId,
-                                                                                             jboolean avoidStairs) {
+                                                                                     jint roomId,
+                                                                                     jboolean avoidStairs) {
     NativeApp& a = app();
     // Only ExploreState accepts DESTINATION_SELECTED, so drop any active route first
-    if (a.engine.GetCurrentStateType() != StateType::Explore) {
+    if (a.engine.GetCurrentStateType() != CoreStateType::Explore) {
         cancelNavigation(a);
     }
     sendEvent(a, "DESTINATION_SELECTED", roomId, avoidStairs == JNI_TRUE);
 
-    a.engine.ChangeState(StateType::RoutePlanning);
+    a.engine.ChangeState(CoreStateType::RoutePlanning);
     a.engine.Update(kEventTick);
-    a.engine.ChangeState(StateType::Navigation);
+    a.engine.ChangeState(CoreStateType::Navigation);
     a.engine.Update(kEventTick);
     a.guidanceStep = 0;
     syncRenderer(a);
@@ -169,7 +165,7 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSelectDestinat
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeAdvanceWaypoint(JNIEnv*, jobject) {
     NativeApp& a = app();
     EngineContext& ctx = a.engine.GetContext();
-    if (a.engine.GetCurrentStateType() != StateType::Navigation || ctx.activeRoute.empty()) {
+    if (a.engine.GetCurrentStateType() != CoreStateType::Navigation || ctx.activeRoute.empty()) {
         return;
     }
     if (a.guidanceStep + 1 < ctx.activeRoute.size()) {
