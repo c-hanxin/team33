@@ -49,4 +49,25 @@ if(NOT ANDROID)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
         add_subdirectory(tests)
     endif()
+else()
+    # ---------------------------------------------------------
+    # Platform: Android Shell & Native Library
+    # ---------------------------------------------------------
+    add_library(indoornav_native SHARED
+        platform/android/app/src/main/cpp/jni_bridge.cpp
+        platform/android/app/src/main/cpp/LogcatStream.cpp
+        source/render/Renderer.cpp
+        source/render/ShaderProgram.cpp
+    )
+
+    target_include_directories(indoornav_native PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/source
+        ${CMAKE_CURRENT_SOURCE_DIR}/platform/android/app/src/main/cpp
+    )
+
+    target_link_libraries(indoornav_native PRIVATE
+        nav_engine
+        GLESv3
+        log
+    )
 endif()
