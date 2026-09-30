@@ -7,9 +7,12 @@
 //       1. Updated header include from "renderer/ShaderProgram.h" to "render/ShaderProgram.h".
 //       2. Wrapped <android/log.h> with #if defined(__ANDROID__) and provided portable
 //          fprintf(stderr, ...) fallback logging for non-Android / desktop builds.
+//       3. Added check in create() to delete any previously existing shader program
+//          before compiling and linking a new program, preventing handle leakage on context restore.
 //   - [WHY]:
 //       1. Conform to the CSD2401 M1 directory hierarchy (source/render/).
 //       2. Allow cross-platform builds without failing on desktop hosts lacking Android NDK.
+//       3. Prevent OpenGL program handle leaks and ensure clean context recreation on Android.
 // ==============================================================================
 
 // [MODIFIED FROM ARUN'S CODE]: Updated include path from "renderer/ShaderProgram.h" to "render/ShaderProgram.h"
@@ -31,6 +34,11 @@ namespace {
 }
 
 bool ShaderProgram::create(const char* vertexSrc, const char* fragmentSrc) {
+    if (program_ != 0) {
+        glDeleteProgram(program_);
+        program_ = 0;
+    }
+
     const GLuint vs = compile(GL_VERTEX_SHADER, vertexSrc);
     const GLuint fs = compile(GL_FRAGMENT_SHADER, fragmentSrc);
     if (vs == 0 || fs == 0) {

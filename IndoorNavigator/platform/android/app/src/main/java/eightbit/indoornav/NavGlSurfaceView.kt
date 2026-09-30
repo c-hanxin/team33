@@ -44,12 +44,16 @@ class NavGlSurfaceView @JvmOverloads constructor(
 
     init {
         setEGLContextClientVersion(3)
+        preserveEGLContextOnPause = true
         setRenderer(this)
         renderMode = RENDERMODE_CONTINUOUSLY
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         NativeEngine.nativeOnSurfaceCreated()
+        if (width > 0 && height > 0) {
+            NativeEngine.nativeOnSurfaceChanged(width, height, density)
+        }
         lastFrameTimeNs = System.nanoTime()
     }
 

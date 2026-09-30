@@ -11,17 +11,24 @@
 //       5. Renamed JNI export prefix to Java_eightbit_indoornav_NativeEngine_ matching
 //          the shortened eightbit.indoornav package.
 //       6. Refactored NativeApp to hold CoreStateManager directly instead of StateManager_temp.
+//       7. Added std::mutex (g_appMutex) guarding all JNI export entry points.
+//       8. Added bounds checking on guidanceStep in buildStatus().
 //   - [WHY]:
-//       Stage 2 Kotlin migration: Global & UI State Management (Tier 1) has been migrated to
-//       Kotlin (GlobalStateManager.kt and AppStateManager.kt). C++ now exclusively handles
-//       high-performance simulation (CoreStateManager) and 3D rendering (Renderer),
-//       completing clean architectural separation between Kotlin UI and C++ Engine.
+//       1. Stage 2 Kotlin migration: Global & UI State Management (Tier 1) has been migrated to
+//          Kotlin (GlobalStateManager.kt and AppStateManager.kt). C++ now exclusively handles
+//          high-performance simulation (CoreStateManager) and 3D rendering (Renderer),
+//          completing clean architectural separation between Kotlin UI and C++ Engine.
+//       2. Concurrency & Context Recovery: Android runs rendering on GLThread while status HUD
+//          queries run on the UI main thread (Looper.getMainLooper()). A mutex prevents data races
+//          on NativeApp during screen rotation, pause/resume, and app restart, eliminating
+//          black screen hangs and vector out-of-bounds segfaults.
 // ==============================================================================
 
 #include <jni.h>
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 
@@ -47,6 +54,10 @@ namespace {
     // Lives for the whole process, so engine state survives Activity recreation
     // (screen rotation etc.). Only the GL resources get rebuilt.
     std::unique_ptr<NativeApp> g_app;
+
+    // Mutex ensuring thread safety between the Android UI thread (nativeGetStatus)
+    // and the GLSurfaceView thread (nativeOnDrawFrame, nativeOnSurfaceCreated, touch events).
+    std::mutex g_appMutex;
 
     NativeApp& app() {
         if (!g_app) {
@@ -86,7 +97,7 @@ namespace {
         os << "Floor: Level " << ctx.currentFloorId << "   |   Avoid stairs: " << (ctx.avoidStairs ? "ON" : "OFF")
            << '\n';
 
-        if (ctx.activeRoute.empty()) {
+        if (ctx.activeRoute.empty() || a.guidanceStep >= ctx.activeRoute.size()) {
             os << "No active route. Pick a destination above.";
         } else {
             const std::size_t step = a.guidanceStep;
@@ -106,6 +117,7 @@ extern "C" {
 // ---------------------------------------------------------------- GL lifecycle
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnSurfaceCreated(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     NativeApp& a = app();
     a.renderer.initGl();
     syncRenderer(a);
@@ -114,11 +126,13 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnSurfaceCreat
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnSurfaceChanged(JNIEnv*, jobject,
                                                                                    jint width, jint height,
                                                                                    jfloat density) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     app().renderer.resize(width, height, density);
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnDrawFrame(JNIEnv*, jobject,
                                                                                jfloat deltaTime) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     // NOTE: engine.Update() is only ticked after events for now.
     app().renderer.draw(deltaTime);
 }
@@ -127,17 +141,20 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnDrawFrame(JN
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnDrag(JNIEnv*, jobject, jfloat dx,
                                                                          jfloat dy) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     app().renderer.orbit(dx, dy);
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeOnZoom(JNIEnv*, jobject,
                                                                          jfloat scaleFactor) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     app().renderer.zoom(scaleFactor);
 }
 
 // ---------------------------------------------------------------- Engine events
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSetFloor(JNIEnv*, jobject, jint floor) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     NativeApp& a = app();
     sendEvent(a, "FLOOR_SWITCH", floor);
     a.engine.Update(kEventTick);
@@ -147,6 +164,7 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSetFloor(JNIEn
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSelectDestination(JNIEnv*, jobject,
                                                                                      jint roomId,
                                                                                      jboolean avoidStairs) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     NativeApp& a = app();
     // Only ExploreState accepts DESTINATION_SELECTED, so drop any active route first
     if (a.engine.GetCurrentStateType() != CoreStateType::Explore) {
@@ -163,6 +181,7 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeSelectDestinat
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeAdvanceWaypoint(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     NativeApp& a = app();
     EngineContext& ctx = a.engine.GetContext();
     if (a.engine.GetCurrentStateType() != CoreStateType::Navigation || ctx.activeRoute.empty()) {
@@ -176,12 +195,14 @@ JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeAdvanceWaypoin
 }
 
 JNIEXPORT void JNICALL Java_eightbit_indoornav_NativeEngine_nativeCancelNavigation(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     NativeApp& a = app();
     cancelNavigation(a);
     syncRenderer(a);
 }
 
 JNIEXPORT jstring JNICALL Java_eightbit_indoornav_NativeEngine_nativeGetStatus(JNIEnv* env, jobject) {
+    std::lock_guard<std::mutex> lock(g_appMutex);
     return env->NewStringUTF(buildStatus(app()).c_str());
 }
 

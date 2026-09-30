@@ -8,10 +8,16 @@
 //       2. Replaced direct <android/log.h> calls with portable LOG_ERROR, LOG_INFO,
 //          and LOG_WRITE macros that output to Android logcat when __ANDROID__ is defined,
 //          and standard stdout/stderr on desktop platforms.
+//       3. Added immediate glViewport initialization and camera update in initGl() if dimensions
+//          are already known, avoiding uninitialized 0x0 viewports on Android resume/rerun.
+//       4. Added safe deletion of existing VAO/VBO handles before reallocating in initGl()
+//          and buildFloorGeometry() to handle EGL context restore cleanly.
+//       5. Added null checks for shader_.id() and floorVao_ in draw() to prevent crashes.
 //   - [WHY]:
 //       1. Conform to CSD2401 M1 directory layout (source/render/).
-//       2. Satisfy M1 Requirement #2 ("The same C++ source runs on your target... and on a desktop dev/debug build")
-//          without desktop builds failing on missing <android/log.h>.
+//       2. Satisfy M1 Requirement #2 without desktop builds failing on missing <android/log.h>.
+//       3. Fix black screen issue caused by Android EGL context recreation where onSurfaceChanged()
+//          is not re-dispatched when dimensions are identical.
 // ==============================================================================
 
 // [MODIFIED FROM ARUN'S CODE]: Updated include path from "renderer/Renderer.h" to "render/Renderer.h"
@@ -96,6 +102,14 @@ bool Renderer::initGl() {
 
     buildFloorGeometry();
 
+    if (routeVao_ != 0) {
+        glDeleteVertexArrays(1, &routeVao_);
+        routeVao_ = 0;
+    }
+    if (routeVbo_ != 0) {
+        glDeleteBuffers(1, &routeVbo_);
+        routeVbo_ = 0;
+    }
     glGenVertexArrays(1, &routeVao_);
     glGenBuffers(1, &routeVbo_);
     glBindVertexArray(routeVao_);
@@ -108,6 +122,15 @@ bool Renderer::initGl() {
     GLfloat lineRange[2]{1.0f, 1.0f};
     glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, lineRange);
     lineWidth_ = std::clamp(2.0f * density_, lineRange[0], lineRange[1]);
+
+    // [MODIFIED FROM ARUN'S CODE]: Immediately initialize viewport and camera on context creation/restore.
+    // On Android, if an EGL context is recreated while the app resumes and screen dimensions did not change,
+    // onSurfaceChanged() is often not called by GLSurfaceView. Setting glViewport here ensures the new
+    // context never renders into an uninitialized 0x0 viewport (preventing black screen).
+    if (viewportWidth_ > 1 && viewportHeight_ > 1) {
+        glViewport(0, 0, viewportWidth_, viewportHeight_);
+        updateCamera();
+    }
 
     // [MODIFIED FROM ARUN'S CODE]: Replaced raw __android_log_print with portable LOG_INFO macro
     LOG_INFO(kLogTag, "GL ready: %s | %s", glGetString(GL_RENDERER), glGetString(GL_VERSION));
@@ -176,6 +199,14 @@ void Renderer::buildFloorGeometry() {
     }
     floorGrid_.count = static_cast<GLsizei>(verts.size() / 3) - floorGrid_.first;
 
+    if (floorVao_ != 0) {
+        glDeleteVertexArrays(1, &floorVao_);
+        floorVao_ = 0;
+    }
+    if (floorVbo_ != 0) {
+        glDeleteBuffers(1, &floorVbo_);
+        floorVbo_ = 0;
+    }
     glGenVertexArrays(1, &floorVao_);
     glGenBuffers(1, &floorVbo_);
     glBindVertexArray(floorVao_);
@@ -224,6 +255,10 @@ void Renderer::drawRange(const DrawRange& range, GLenum mode, const Mat4& mvp, f
 }
 
 void Renderer::draw(float deltaTime) {
+    if (shader_.id() == 0 || floorVao_ == 0) {
+        return; // GL resources not yet initialized or context lost
+    }
+
     elapsed_ += deltaTime;
     idleTime_ += deltaTime;
     if (idleTime_ > kIdleBeforeSpin) {
